@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify Clone</title>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+    }
+    .box {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Spotify Clone Frontend</h2>
+
+<!-- REGISTER -->
+<div class="box">
+<h3>Register</h3>
+<input id="rUser" placeholder="Username">
+<input id="rEmail" placeholder="Email">
+<input id="rPass" placeholder="Password">
+<select id="rRole" aria-label="Select role">
+  <option value="user">User</option>
+  <option value="artist">Artist</option>
+</select>
+<button onclick="register()">Register</button>
+</div>
+
+<!-- LOGIN -->
+<div class="box">
+<h3>Login</h3>
+<input id="lEmail" placeholder="Email">
+<input id="lPass" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+
+<!-- LOGOUT -->
+<div class="box">
+<button onclick="logout()">Logout</button>
+</div>
+
+<!-- UPLOAD MUSIC (Artist Only) -->
+<div class="box">
+<h3>Upload Music (Artist)</h3>
+<input id="musicTitle" placeholder="Title">
+<input type="file" id="musicFile" placeholder="upload">
+<button onclick="uploadMusic()">Upload</button>
+</div>
+
+<!-- CREATE ALBUM -->
+<div class="box">
+<h3>Create Album (Artist)</h3>
+<input id="albumTitle" placeholder="Album Title">
+<input id="albumMusics" placeholder="Music IDs (comma separated)">
+<button onclick="createAlbum()">Create</button>
+</div>
+
+<!-- GET MUSICS -->
+<div class="box">
+<h3>All Musics (User)</h3>
+<button onclick="getMusics()">Load</button>
+<ul id="musicList"></ul>
+</div>
+
+<!-- GET ALBUMS -->
+<div class="box">
+<h3>All Albums (User)</h3>
+<button onclick="getAlbums()">Load</button>
+<ul id="albumList"></ul>
+</div>
+
+<script>
+
+const API =
+ location.hostname === "localhost"
+   ? "http://localhost:3000"
+   : "https://spotify-songs-1.onrender.com";
+
+// REGISTER
+async function register(){
+  await fetch(`${API}/api/auth/register`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"include",
+    body:JSON.stringify({
+      username:rUser.value,
+      email:rEmail.value,
+      password:rPass.value,
+      role:rRole.value
+    })
+  });
+  alert("Registered!");
+}
+
+// LOGIN
+async function login(){
+  const res = await fetch(`${API}/api/auth/login`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"include",
+    body:JSON.stringify({
+      email:lEmail.value,
+      password:lPass.value
+    })
+  });
+
+  const data=await res.json();
+  alert(data.message);
+}
+
+// LOGOUT
+async function logout(){
+  await fetch(`${API}/api/auth/logout`,{
+    method:"POST",
+    credentials:"include"
+  });
+  alert("Logged out");
+}
+
+// UPLOAD MUSIC
+async function uploadMusic(){
+  const formData=new FormData();
+  formData.append("title",musicTitle.value);
+  formData.append("music",musicFile.files[0]);
+
+  const res=await fetch(`${API}/api/music/upload`,{
+    method:"POST",
+    credentials:"include",
+    body:formData
+  });
+
+  const data=await res.json();
+  alert(data.message);
+}
+
+// CREATE ALBUM
+async function createAlbum(){
+  const ids=albumMusics.value.split(",");
+
+  const res=await fetch(`${API}/api/music/album`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"include",
+    body:JSON.stringify({
+      title:albumTitle.value,
+      musics:ids
+    })
+  });
+
+  const data=await res.json();
+  alert(data.message);
+}
+
+// GET MUSICS
+async function getMusics(){
+  const res=await fetch(`${API}/api/music`,{
+    credentials:"include"
+  });
+
+  const data=await res.json();
+
+  musicList.innerHTML="";
+  data.musics.forEach(m=>{
+    const li=document.createElement("li");
+    li.innerText=`${m.title} by ${m.artist.username}`;
+    musicList.appendChild(li);
+  });
+}
+
+// GET ALBUMS
+async function getAlbums(){
+  const res=await fetch(`${API}/api/music/albums`,{
+    credentials:"include"
+  });
+
+  const data=await res.json();
+
+  albumList.innerHTML="";
+  data.albums.forEach(a=>{
+    const li=document.createElement("li");
+    li.innerText=a.title;
+    albumList.appendChild(li);
+  });
+}
+
+</script>
+
+</body>
+</html>
