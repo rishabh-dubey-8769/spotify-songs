@@ -86,7 +86,10 @@
 
 <script>
 
-const API ="https://spotify-songs-backend-krsd.onrender.com";
+const API =
+ location.hostname === "localhost"
+   ? "http://localhost:3000"
+   : "https://spotify-songs-frontend.onrender.com";
 
 // REGISTER
 async function register(){
@@ -199,5 +202,6 @@ async function getAlbums(){
 
 </body>
 </html>
+
 
 
