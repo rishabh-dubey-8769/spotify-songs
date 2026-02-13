@@ -7,10 +7,14 @@ const cors=require("cors");
 const app=express()
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  // origin: true,
+  origin: [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "https://spotify-songs-frontend.onrender.com"
+  ],
   credentials: true
 }));
+
 
 
 app.use(express.json())
@@ -19,4 +23,5 @@ app.use('/api/auth',authRoutes)
 app.use('/api/music',musicRoutes)
 
 module.exports=app
+
 
