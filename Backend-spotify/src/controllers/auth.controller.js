@@ -104,6 +104,17 @@ async function logoutUser(req,res){
     })
 }
 
-module.exports={registerUser,loginUser,logoutUser}
+async function getUserCount(req,res){
+  try{
+    const count = await userModel.countDocuments();
+    res.status(200).json({count});
+  }catch(err){
+    res.status(500).json({message:"Server error"});
+  }
+}
+
+
+module.exports={registerUser,loginUser,logoutUser,getUserCount}
+
 
 
