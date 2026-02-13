@@ -4,6 +4,15 @@ const bcrypt=require('bcryptjs')
 
 async function registerUser(req,res){
     const {username,email,password,role='user'}=req.body
+    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ STRICT NITP EMAIL CHECK
+    const nitpEmailCheck=/^[a-zA-Z0-9._%+-]+(\.ee|\.me)@nitp\.ac\.in$/;
+    
+    if(!nitpEmailCheck.test(email)){
+        return res.status(400).json({
+            message:"Register through NITP Email Id only."
+        });
+    }
+
     const isUserAlreadyExists=await userModel.findOne({
         $or:[
             {username},
@@ -50,6 +59,15 @@ async function registerUser(req,res){
 
 async function loginUser(req,res){
     const {username,email,password}=req.body
+    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ STRICT NITP EMAIL CHECK
+    const nitpEmailCheck=/^[a-zA-Z0-9._%+-]+(\.ee|\.me)@nitp\.ac\.in$/;
+    
+    if(email && !nitpEmailCheck.test(email)){
+        return res.status(400).json({
+            message:"Login through NITP Email Id only."
+        });
+    }
+
     const user=await userModel.findOne({
         $or:[
             {username},
@@ -115,6 +133,7 @@ async function getUserCount(req,res){
 
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount}
+
 
 
 
