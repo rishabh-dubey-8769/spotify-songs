@@ -138,7 +138,8 @@ async function getMe(req,res){
 }
 
 
-module.exports={registerUser,loginUser,logoutUser,getUserCount}
+module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe}
+
 
 
 
