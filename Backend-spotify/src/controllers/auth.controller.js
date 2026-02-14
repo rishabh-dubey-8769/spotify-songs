@@ -132,13 +132,33 @@ async function getUserCount(req,res){
 }
 
 async function getMe(req,res){
-  const user=await userModel.findById(req.user.id).select("-password");
+  try{
+    const token = req.cookies.token;
 
-  res.status(200).json({user});
+    if(!token){
+      return res.status(401).json({message:"Not logged in"});
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await userModel.findById(decoded.id)
+      .select("-password");
+
+    if(!user){
+      return res.status(404).json({message:"User not found"});
+    }
+
+    res.status(200).json({user});
+
+  }catch(err){
+    res.status(401).json({message:"Invalid token"});
+  }
 }
 
 
+
 module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe}
+
 
 
 
