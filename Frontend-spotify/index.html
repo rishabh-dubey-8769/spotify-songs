@@ -12,9 +12,10 @@
         <h2 id="page-heading"></h2>
         <a href="register.html"><button class="i-btn">Register New Account</button></a>
         <a href="login.html"><button class="i-btn">Login Your Account</button></a>
-        <script src="script.js"></script>
     </div>
     <p id="user-count">Total users: loading...</p>
-
+    <script src="script.js">
+        if(window.location.pathname.includes("index.html") || window.location.pathname === "/"){checkLogin();}
+    </script>
 </body>
 </html>
