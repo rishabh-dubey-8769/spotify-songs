@@ -131,8 +131,15 @@ async function getUserCount(req,res){
   }
 }
 
+async function getMe(req,res){
+  const user=await userModel.findById(req.user.id).select("-password");
+
+  res.status(200).json({user});
+}
+
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount}
+
 
 
 
