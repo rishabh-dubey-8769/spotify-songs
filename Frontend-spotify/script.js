@@ -153,7 +153,16 @@ async function checkLogin(){
 
     if(data?.user){
       localStorage.setItem("user", JSON.stringify(data.user));
+      
+      const path = window.location.pathname;
 
+      // If on index page → just alert
+      if (path.includes("index.html") || path === "/") {
+          alert("Already logged in. To register a new account, logout first.");
+          hideLoader();
+          return;
+      }
+     
       // small delay so loader shows nicely
       setTimeout(()=>{
         if(data.user.role === "artist"){
@@ -224,3 +233,4 @@ checkLogin();
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //upload music
+
