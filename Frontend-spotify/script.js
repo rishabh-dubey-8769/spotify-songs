@@ -123,9 +123,23 @@ function hideLoader(){
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 async function checkLogin(){
+
+  // run only on public pages
+  const path = window.location.pathname.toLowerCase();
+
+  const isPublicPage =
+      path.endsWith("index.html") ||
+      path.endsWith("login.html") ||
+      path.endsWith("register.html") ||
+      path === "/" ||
+      path === "";
+
+  if(!isPublicPage) return;
+
   showLoader();
+
   try{
-    const res=await fetch(`${API}/api/auth/me`,{
+    const res = await fetch(`${API}/api/auth/me`,{
       method:"GET",
       credentials:"include"
     });
@@ -135,21 +149,30 @@ async function checkLogin(){
       return;
     }
 
-    const data=await res.json();
+    const data = await res.json();
 
-    if(data.user.role==="artist"){
-      window.location.href="artist-profile.html";
+    if(data?.user){
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      // small delay so loader shows nicely
+      setTimeout(()=>{
+        if(data.user.role === "artist"){
+          window.location.replace("artist-profile.html");
+        } else {
+          window.location.replace("user-profile.html");
+        }
+      }, 500);
     }
     else{
-      window.location.href="user-profile.html";
+      hideLoader();
     }
-  }
-  catch(err){
+
+  }catch(err){
     hideLoader();
   }
 }
 
-
+checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //create album
