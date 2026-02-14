@@ -160,7 +160,7 @@ async function checkLogin(){
       if (path.includes("index.html") || path === "/") {
           alert("Already logged in. To register a new account, logout first.");
           hideLoader();
-          return;
+          // return;
       }
      
       // small delay so loader shows nicely
@@ -233,4 +233,5 @@ checkLogin();
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //upload music
+
 
