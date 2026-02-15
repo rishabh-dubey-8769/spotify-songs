@@ -30,7 +30,14 @@ async function verifyOtp(){
     })
   });
 
-  const data = await res.json();
+  let data;
+  try {
+      data = await res.json();
+  } catch(err){
+      console.error("Non-JSON response from server:", await res.text());
+      alert("Server error: Could not verify OTP. Check console for details.");
+      return;
+  }
   alert(data.message);
 
   if(res.ok){
@@ -257,6 +264,7 @@ async function checkLogin(){
 
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
