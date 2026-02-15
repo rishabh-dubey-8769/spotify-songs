@@ -4,15 +4,33 @@ const API =
    : "https://spotify-songs-backend-krsd.onrender.com"; // your production URL here
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-async function sendOtp(){
-  const res = await fetch(`${API}/api/auth/send-otp-register`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({email:document.getElementById("email").value})
-  });
+async function sendOtp() {
+  const emailField = document.getElementById("email").value;
+  const userField = document.getElementById("ruser").value;
 
-  const data = await res.json();
-  alert(data.message);
+  if (!emailField || !userField) {
+    alert("Please enter both Username and Email before sending OTP.");
+    return;
+  }
+
+  showLoader();
+  try {
+    const res = await fetch(`${API}/api/auth/send-otp-register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        email: emailField,
+        username: userField // Sending username now
+      })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+  } catch (error) {
+    alert("Error sending OTP");
+  } finally {
+    hideLoader();
+  }
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -275,6 +293,7 @@ async function checkLogin(){
 
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
