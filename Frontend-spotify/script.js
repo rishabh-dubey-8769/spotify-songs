@@ -16,35 +16,46 @@ async function sendOtp(){
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function verifyOtp(){
-  const res = await fetch(`${API}/api/auth/verify-otp-register`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    credentials:"include",
-    body:JSON.stringify({
-      username:document.getElementById("ruser").value,
-      email:document.getElementById("email").value,
-      password:document.getElementById("rpass").value,
-      role:document.getElementById("rrole").value,
-      otp:document.getElementById("otp").value
-    })
-  });
+async function verifyOtp() {
+  const emailVal = document.getElementById("email").value;
+  const otpVal = document.getElementById("otp").value;
+  const userVal = document.getElementById("ruser").value;
+  const passVal = document.getElementById("rpass").value;
+  const roleVal = document.getElementById("rrole").value;
 
-  let data;
-  try {
-      data = await res.json();
-  } catch(err){
-      console.error("Non-JSON response from server:", await res.text());
-      alert("Server error: Could not verify OTP. Check console for details.");
+  if(!userVal || !passVal || !otpVal) {
+      alert("Please fill all fields before verifying!");
       return;
   }
-  alert(data.message);
 
-  if(res.ok){
-    window.location.href="login.html";
+  showLoader();
+  try {
+    const res = await fetch(`${API}/api/auth/verify-otp-register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        username: userVal,
+        email: emailVal,
+        password: passVal,
+        role: roleVal,
+        otp: otpVal
+      })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+
+    if (res.ok) {
+      window.location.href = "login.html";
+    }
+  } catch (error) {
+    console.error("Verification Error:", error);
+    alert("Something went wrong. Check the console.");
+  } finally {
+    hideLoader();
   }
 }
-
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 function forgot(){
@@ -264,6 +275,7 @@ async function checkLogin(){
 
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
