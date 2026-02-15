@@ -1,300 +1,244 @@
 const sendOTP = require("../services/mail.service");
-const userModel=require('../models/user.model')
-const jwt=require('jsonwebtoken')
-const bcrypt=require('bcryptjs')
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-const OtpTemp = require("../models/otp.model");
+const userModel = require('../models/user.model');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
-async function sendOtpRegister(req,res){
-  try{
-    const {email} = req.body;
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Send OTP for registration (does NOT create user yet)
+async function sendOtpRegister(req, res) {
+    try {
+        const { email } = req.body;
 
-    let otpEntry = await OtpTemp.findOne({email});
-    const diff = otpEntry ? Date.now() - otpEntry.otpLastAttempt : 0;
+        const user = await userModel.findOne({ email });
 
-    if(otpEntry && otpEntry.otpAttempts >= 3 && diff < 60*60*1000){
-        return res.status(429).json({message:"Max OTP attempts reached. Try after 1 hour."});
-    }
-
-    const otp = Math.floor(100000 + Math.random()*900000).toString();
-    const expiry = new Date(Date.now()+10*60*1000);
-
-    if(otpEntry){
-        otpEntry.otp = otp;
-        otpEntry.otpExpiry = expiry;
-        otpEntry.otpAttempts = otpEntry.otpAttempts + 1;
-        otpEntry.otpLastAttempt = new Date();
-        await otpEntry.save();
-    } else {
-        await OtpTemp.create({
-            email,
-            otp,
-            otpExpiry: expiry,
-            otpAttempts: 1,
-            otpLastAttempt: new Date()
-        });
-    }
-
-    await sendOTP(email, otp);
-
-    res.json({message:"OTP sent to email"});
-  } catch(err){
-    console.error("OTP ERROR FULL:", err);
-    res.status(500).json({message:"OTP failed"});
-  }
-}
-
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function registerUser(req,res){
-    const {username,email,password,role='user'}=req.body;
-
-    // ⚠️ STRICT NITP EMAIL CHECK
-    const nitpEmailCheck=/^[a-zA-Z0-9._%+-]+(\.ee|\.me)@nitp\.ac\.in$/;
-    if(!nitpEmailCheck.test(email)){
-        return res.status(400).json({
-            message:"Register through NITP Email Id only."
-        });
-    }
-
-    const existing=await userModel.findOne({email});
-    if(existing && existing.isVerified){
-        return res.status(409).json({message:"User already exists"});
-    }
-
-    // 🔥 OTP GENERATE
-    const otp=Math.floor(100000+Math.random()*900000).toString();
-
-    const hash=await bcrypt.hash(password,10);
-
-    const user=await userModel.findOneAndUpdate(
-        {email},
-        {
-            username,
-            password:hash,
-            role,
-            otp,
-            otpExpiry:new Date(Date.now()+10*60*1000),
-            isVerified:false
-        },
-        {upsert:true,new:true}
-    );
-
-    // 🔥 SEND OTP EMAIL
-    const sendOTP=require("../services/mail.service");
-    await sendOTP(email,otp);
-
-    return res.status(200).json({
-        message:"OTP sent to email. Verify to complete registration."
-    });
-}
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-const OtpTemp = require("../models/otp.model");
-const userModel = require("../models/user.model");
-
-async function verifyOtpRegister(req,res){
-    const {email, otp, username, password, role='user'} = req.body;
-
-    const otpEntry = await OtpTemp.findOne({email});
-
-    if(!otpEntry || otpEntry.otp !== otp || otpEntry.otpExpiry < new Date()){
-        return res.status(400).json({message:"Invalid or expired OTP"});
-    }
-
-    // OTP valid → create or update user
-    const hash = await bcrypt.hash(password, 10);
-
-    let user = await userModel.findOneAndUpdate(
-        {email},
-        {
-            username,
-            password: hash,
-            role,
-            isVerified: true
-        },
-        {upsert:true, new:true}
-    );
-
-    // delete temp OTP
-    await otpEntry.deleteOne();
-
-    // generate JWT
-    const token = jwt.sign({id: user._id, role: user.role}, process.env.JWT_SECRET);
-
-    res.cookie('token', token, {
-        httpOnly:true,
-        secure:true,
-        sameSite:"none",
-        maxAge:7*24*60*60*1000
-    });
-
-    return res.json({
-        message:"Registration successful",
-        user:{
-            id:user._id,
-            username:user.username,
-            email:user.email,
-            role:user.role
+        // Limit OTP attempts to 3 per hour
+        if (user && user.otpLastAttempt) {
+            const diff = Date.now() - user.otpLastAttempt.getTime();
+            if (diff < 60 * 60 * 1000 && user.otpAttempts >= 3) {
+                return res.status(429).json({ message: "Max OTP attempts reached. Try after 1 hour." });
+            }
         }
-    });
-}
 
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function loginUser(req,res){
-    const {username,email,password}=req.body
-    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ STRICT NITP EMAIL CHECK
-    const nitpEmailCheck=/^[a-zA-Z0-9._%+-]+(\.ee|\.me)@nitp\.ac\.in$/;
-    
-    if(email && !nitpEmailCheck.test(email)){
-        return res.status(400).json({
-            message:"Login through NITP Email Id only."
-        });
-    }
-
-    const user=await userModel.findOne({
-        $or:[
-            {username},
-            {email}
-        ]
-    })
-    if(!user){
-        return res.status(401).json({
-            message:'User not found.Please register first'
-        })
-    }
-
-    if(!user.isVerified){
-        return res.status(403).json({
-            message:"Please verify OTP before login"
-        });
-    }
-  
-    const isPasswordValid=await bcrypt.compare(password,user.password)
-    if(!isPasswordValid){
-        return res.status(401).json({
-            message:'Invalid password'
-        })
-    }
-
-    const token=jwt.sign({
-        id:user._id,
-        role:user.role
-    },process.env.JWT_SECRET)
-
-    res.cookie('token', token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-
-    return res.status(200).json({
-        message:'User logged in successfully',
-        user:{
-            id:user._id,
-            username:user.username,
-            email:user.email,
-            role:user.role
+        if (user) {
+            // update existing user's OTP info
+            user.otp = otp;
+            user.otpExpiry = expiry;
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+            user.otpLastAttempt = new Date();
+            await user.save();
+        } else {
+            // Only temp OTP info, do NOT create user yet
+            await userModel.updateOne(
+                { email },
+                { otp, otpExpiry: expiry, otpAttempts: 1, otpLastAttempt: new Date() },
+                { upsert: false }
+            );
         }
-    })
-}
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function sendOtpForgot(req,res){
-  const {email} = req.body;
 
-  const user = await userModel.findOne({email});
-  if(!user) return res.status(404).json({message:"No user"});
+        await sendOTP(email, otp);
+        return res.json({ message: "OTP sent to email (check spam too!)" });
 
-  const otp = Math.floor(100000 + Math.random()*900000).toString();
-
-  user.otp=otp;
-  user.otpExpiry=new Date(Date.now()+10*60*1000);
-
-  await user.save();
-
-  await sendOTP(email,otp);
-
-  res.json({message:"OTP sent"});
-}
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function resetPassword(req,res){
-  const {email,otp,newPassword} = req.body;
-
-  const user = await userModel.findOne({email});
-
-  if(!user || user.otp!==otp || user.otpExpiry<new Date()){
-    return res.status(400).json({message:"Invalid OTP"});
-  }
-
-  user.password=await bcrypt.hash(newPassword,10);
-  user.otp=null;
-
-  await user.save();
-
-  res.json({message:"Password updated"});
+    } catch (err) {
+        console.error("OTP ERROR:", err);
+        return res.status(500).json({ message: "Failed to send OTP" });
+    }
 }
 
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function logoutUser(req,res){
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Verify OTP and create or update user
+async function verifyOtpRegister(req, res) {
+    try {
+        const { email, otp, username, password, role = 'user' } = req.body;
+
+        if (!email || !otp || !username || !password) {
+            return res.status(400).json({ message: "Email, OTP, username and password are required" });
+        }
+
+        const user = await userModel.findOne({ email });
+
+        if (!user || user.otp !== otp || user.otpExpiry < new Date()) {
+            return res.status(400).json({ message: "Invalid or expired OTP" });
+        }
+
+        const hash = await bcrypt.hash(password, 10);
+
+        // Create or update user
+        user.username = username;
+        user.password = hash;
+        user.role = role;
+        user.isVerified = true;
+        user.otp = null;
+        user.otpExpiry = null;
+        user.otpAttempts = 0;
+        user.otpLastAttempt = null;
+
+        await user.save();
+
+        // Generate JWT cookie
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        return res.json({
+            message: "Registration successful",
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+            }
+        });
+
+    } catch (err) {
+        console.error("Verify OTP ERROR:", err);
+        return res.status(500).json({ message: "Server error during OTP verification" });
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Login user
+async function loginUser(req, res) {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password required" });
+        }
+
+        const nitpEmailCheck = /^[a-zA-Z0-9._%+-]+(\.ee|\.me)@nitp\.ac\.in$/;
+        if (!nitpEmailCheck.test(email)) {
+            return res.status(400).json({ message: "Login through NITP Email only" });
+        }
+
+        const user = await userModel.findOne({ email });
+        if (!user) return res.status(401).json({ message: "User not found. Please register first" });
+        if (!user.isVerified) return res.status(403).json({ message: "Please verify OTP before login" });
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) return res.status(401).json({ message: "Invalid password" });
+
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        return res.json({
+            message: "Login successful",
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+            }
+        });
+    } catch (err) {
+        console.error("Login ERROR:", err);
+        return res.status(500).json({ message: "Server error during login" });
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Forgot password OTP
+async function sendOtpForgot(req, res) {
+    try {
+        const { email } = req.body;
+        const user = await userModel.findOne({ email });
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otp = otp;
+        user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        await user.save();
+
+        await sendOTP(email, otp);
+        return res.json({ message: "OTP sent to email (check spam too!)" });
+    } catch (err) {
+        console.error("Forgot OTP ERROR:", err);
+        return res.status(500).json({ message: "Failed to send OTP" });
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Reset password
+async function resetPassword(req, res) {
+    try {
+        const { email, otp, newPassword } = req.body;
+        const user = await userModel.findOne({ email });
+        if (!user || user.otp !== otp || user.otpExpiry < new Date()) {
+            return res.status(400).json({ message: "Invalid OTP" });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.otp = null;
+        user.otpExpiry = null;
+        await user.save();
+
+        return res.json({ message: "Password updated successfully" });
+    } catch (err) {
+        console.error("Reset Password ERROR:", err);
+        return res.status(500).json({ message: "Server error during password reset" });
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Logout
+async function logoutUser(req, res) {
     res.clearCookie('token', {
         httpOnly: true,
         secure: true,
         sameSite: "none"
     });
-    
-    return res.status(200).json({
-        message:'User logged out successfully'
-    })
+    return res.json({ message: "Logged out successfully" });
 }
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function getUserCount(req,res){
-  try{
-    const count = await userModel.countDocuments();
-    res.status(200).json({count});
-  }catch(err){
-    res.status(500).json({message:"Server error"});
-  }
-}
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function getMe(req,res){
-  try{
-    const token = req.cookies.token;
 
-    if(!token){
-      return res.status(401).json({message:"Not logged in"});
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Get user count
+async function getUserCount(req, res) {
+    try {
+        const count = await userModel.countDocuments();
+        return res.json({ count });
+    } catch (err) {
+        console.error("User Count ERROR:", err);
+        return res.status(500).json({ message: "Server error" });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await userModel.findById(decoded.id)
-      .select("-password");
-
-    if(!user){
-      return res.status(404).json({message:"User not found"});
-    }
-
-    res.status(200).json({user});
-
-  }catch(err){
-    res.status(401).json({message:"Invalid token"});
-  }
 }
 
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Get current logged-in user
+async function getMe(req, res) {
+    try {
+        const token = req.cookies.token;
+        if (!token) return res.status(401).json({ message: "Not logged in" });
 
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await userModel.findById(decoded.id).select("-password");
+        if (!user) return res.status(404).json({ message: "User not found" });
 
-module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe,sendOtpRegister,verifyOtpRegister,sendOtpForgot,resetPassword}
+        return res.json({ user });
+    } catch (err) {
+        console.error("Get Me ERROR:", err);
+        return res.status(401).json({ message: "Invalid token" });
+    }
+}
 
-
-
-
-
-
-
-
-
-
-
-
+module.exports = {
+    sendOtpRegister,
+    verifyOtpRegister,
+    registerUser,
+    loginUser,
+    logoutUser,
+    getUserCount,
+    getMe,
+    sendOtpForgot,
+    resetPassword
+};
