@@ -3,6 +3,55 @@ const API =
    ? "http://localhost:3000"
    : "https://spotify-songs-backend-krsd.onrender.com"; // your production URL here
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+async function sendOtp(){
+  await fetch("/api/auth/send-otp-register",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:email.value})
+  });
+  alert("OTP sent");
+}
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function verifyOtp(){
+  await fetch("/api/auth/verify-otp-register",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      username:username.value,
+      email:email.value,
+      password:password.value,
+      role:role.value,
+      otp:otp.value
+    })
+  });
+  alert("Registered");
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function sendForgot(){
+  await fetch("/api/auth/send-otp-forgot",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:femail.value})
+  });
+  alert("OTP sent");
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function reset(){
+  await fetch("/api/auth/reset-password",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      email:femail.value,
+      otp:fotp.value,
+      newPassword:newpass.value
+    })
+  });
+  alert("Password updated");
+}
+
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Registration
 const registerBtn=document.getElementById("register-account");
 if(registerBtn){
@@ -184,54 +233,5 @@ async function checkLogin(){
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-//create album
-// const createAlbumBtn=document.getElementById("create-album");
-// if(createAlbumBtn){
-//   createAlbumBtn.addEventListener("click", async function(e){
-//     e.preventDefault();
-//     const title=document.getElementById("album-title").value;
-//     const res=await fetch(`${API}/api/music/album`,{
-//         method:"POST",
-//         headers:{"Content-Type":"application/json"},
-//         credentials:"include",
-//         body:JSON.stringify({
-//           title:title,
-//           musics:[]
-//         })
-//     });
-//     const data=await res.json();
-//     alert(data.message);
-//   });
-// }
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-//get albums names
-// const getAllAlbumsBtn=document.getElementById("get-all-albums")
-// if(getAllAlbumsBtn){
-//   getAllAlbumsBtn.addEventListener("click", async function(e){
-//     e.preventDefault();
-//     const res=await fetch(`${API}/api/music/albums`,{
-//         method:"GET",
-//         credentials:"include"
-//     });
-//     const data=await res.json();
-//     const albumsList=document.getElementById("albums-list");
-//     albumsList.innerHTML="";
-    
-//     if(data.albums && data.albums.length > 0){
-//       data.albums.forEach(album=>{
-//         const li = document.createElement("li");
-//         li.textContent = album.title;
-//         albumsList.appendChild(li);
-//       });
-//     } 
-//     else {
-//       albumsList.innerHTML = "<li>No albums found</li>";
-//     }
-//   });
-// }
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//upload music
 
 
