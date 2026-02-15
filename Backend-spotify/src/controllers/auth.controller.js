@@ -26,13 +26,11 @@ async function sendOtpRegister(req,res){
     await userModel.updateOne(
       {email},
       {
-        otp,
-        otpExpiry: expiry,
-        otpAttempts: user ? (user.otpAttempts||0)+1 : 1,
-        otpLastAttempt:new Date()
+        $setOnInsert: {otp, otpExpiry: expiry, otpAttempts: 1, otpLastAttempt: new Date()}
       },
-      {upsert:true}
+      {upsert: true} // This will only create document if email doesn't exist
     );
+
 
     // ✅ Send after saving
     await sendOTP(email, otp);
@@ -47,6 +45,8 @@ async function sendOtpRegister(req,res){
 
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function registerUser(req,res){
     const {username,email,password,role='user'}=req.body;
 
@@ -271,6 +271,7 @@ async function getMe(req,res){
 
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe,sendOtpRegister,verifyOtpRegister,sendOtpForgot,resetPassword}
+
 
 
 
