@@ -4,38 +4,45 @@ const jwt=require('jsonwebtoken')
 const bcrypt=require('bcryptjs')
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function sendOtpRegister(req,res){
-  const {email} = req.body;
+  try{
+    const {email} = req.body;
 
-  const user = await userModel.findOne({email});
+    const user = await userModel.findOne({email});
 
-  // ✅ limit 3 per hour
-  if(user && user.otpLastAttempt){
-    const diff = Date.now() - user.otpLastAttempt.getTime();
+    if(user && user.otpLastAttempt){
+      const diff = Date.now() - user.otpLastAttempt.getTime();
 
-    if(diff < 60*60*1000 && user.otpAttempts >= 3){
-      return res.status(429).json({
-        message:"Max OTP attempts reached. Try after 1 hour."
-      });
+      if(diff < 60*60*1000 && user.otpAttempts >= 3){
+        return res.status(429).json({
+          message:"Max OTP attempts reached. Try after 1 hour."
+        });
+      }
     }
+
+    const otp = Math.floor(100000 + Math.random()*900000).toString();
+    const expiry = new Date(Date.now()+10*60*1000);
+
+    // ✅ Save first
+    await userModel.updateOne(
+      {email},
+      {
+        otp,
+        otpExpiry: expiry,
+        otpAttempts: user ? (user.otpAttempts||0)+1 : 1,
+        otpLastAttempt:new Date()
+      },
+      {upsert:true}
+    );
+
+    // ✅ Send after saving
+    await sendOTP(email, otp);
+
+    res.json({message:"OTP sent to email"});
   }
-
-  const otp = Math.floor(100000 + Math.random()*900000).toString();
-  const expiry = new Date(Date.now()+10*60*1000);
-
-  await sendOTP(email, otp);
-
-  await userModel.updateOne(
-    {email, isVerified:false},
-    {
-      otp,
-      otpExpiry: expiry,
-      otpAttempts: user ? (user.otpAttempts||0)+1 : 1,
-      otpLastAttempt:new Date()
-    },
-    {upsert:true}
-  );
-
-  res.json({message:"OTP sent to email"});
+  catch(err){
+    console.log("OTP ERROR FULL:", err); // VERY IMPORTANT
+    res.status(500).json({message:"OTP failed"});
+  }
 }
 
 
@@ -264,6 +271,7 @@ async function getMe(req,res){
 
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe,sendOtpRegister,verifyOtpRegister,sendOtpForgot,resetPassword}
+
 
 
 
