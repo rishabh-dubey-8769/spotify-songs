@@ -19,10 +19,17 @@ const userSchema=new mongoose.Schema({
         type:String,
         enum:['user','artist'],
         default:'user'
-    }
+    },
+    otp: String,
+    otpExpiry: Date,
+    otpAttempts: { type:Number, default:0 },
+    otpLastAttempt: Date,
+    isVerified: { type:Boolean, default:false }
+
 
 })
 
 const userModel=mongoose.model('user',userSchema)
+
 
 module.exports=userModel
