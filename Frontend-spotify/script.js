@@ -5,55 +5,80 @@ const API =
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 async function sendOtp(){
-  await fetch("/api/auth/send-otp-register",{
+  const res = await fetch(`${API}/api/auth/send-otp-register`,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({email:email.value})
+    body:JSON.stringify({email:document.getElementById("email").value})
   });
-  alert("OTP sent");
+
+  const data = await res.json();
+  alert(data.message);
 }
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function verifyOtp(){
-  await fetch("/api/auth/verify-otp-register",{
+  const res = await fetch(`${API}/api/auth/verify-otp-register`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"include",
+    body:JSON.stringify({
+      username:document.getElementById("ruser").value,
+      email:document.getElementById("email").value,
+      password:document.getElementById("rpass").value,
+      role:document.getElementById("rrole").value,
+      otp:document.getElementById("otp").value
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+
+  if(res.ok){
+    window.location.href="login.html";
+  }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function forgot(){
+  window.location.href="forgot.html";
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function sendForgot(){
+  const res = await fetch(`${API}/api/auth/send-otp-forgot`,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      username:username.value,
-      email:email.value,
-      password:password.value,
-      role:role.value,
-      otp:otp.value
+      email:document.getElementById("femail").value
     })
   });
-  alert("Registered");
+
+  const data = await res.json();
+  alert(data.message);
 }
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-async function sendForgot(){
-  await fetch("/api/auth/send-otp-forgot",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({email:femail.value})
-  });
-  alert("OTP sent");
-}
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function reset(){
-  await fetch("/api/auth/reset-password",{
+  const res = await fetch(`${API}/api/auth/reset-password`,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      email:femail.value,
-      otp:fotp.value,
-      newPassword:newpass.value
+      email:document.getElementById("femail").value,
+      otp:document.getElementById("fotp").value,
+      newPassword:document.getElementById("newpass").value
     })
   });
-  alert("Password updated");
+
+  const data = await res.json();
+  alert(data.message);
 }
+
 
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Registration
-const registerBtn=document.getElementById("register-account");
+const registerBtn=document.getElementById("register-account");                                    //+++++++++++++++++   this whole function is useless  +++++++++++++++++++++++//
 if(registerBtn){
     registerBtn.addEventListener("click", async function(e) {
         e.preventDefault();
@@ -71,7 +96,7 @@ if(registerBtn){
         })
         const data=await res.json()
         alert(data.message);
-        if(res.ok) {window.location.href = "login.html";}
+        if(res.ok) {window.location.href = "login.html";}                                        //+++++++++++++++++   this whole function is useless  +++++++++++++++++++++++//
         hideLoader();
     });
 }
@@ -232,6 +257,7 @@ async function checkLogin(){
 
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
