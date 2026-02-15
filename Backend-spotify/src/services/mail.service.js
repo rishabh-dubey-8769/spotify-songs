@@ -8,17 +8,18 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-async function sendOTP(email, otp){
+async function sendOTP(email, otp) {
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Your OTP Code",
-      text: `Your OTP is ${otp}. Valid for 10 minutes.`
+      subject: "Your Spotify Clone OTP",
+      text: `Your OTP is ${otp}. It expires in 10 minutes.`
     });
-    console.log("OTP sent to:", email); // for debugging
-  } catch(err){
-    console.error("Error sending OTP:", err); // logs SMTP issues
+    console.log("Email sent successfully to:", email);
+  } catch (error) {
+    console.error("NODEMAILER ERROR:", error);
+    throw new Error("Email service failed"); // This lets the controller catch the error
   }
 }
 
