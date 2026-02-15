@@ -13,7 +13,12 @@
     <div class="box">
         <h3>Register</h3>
         <input id="ruser" placeholder="Username" required>
-        <input id="remail" placeholder="Email Id" required>
+        <!-- <input id="remail" placeholder="Email Id" required> -->
+        <input id="email" placeholder="Enter NITP Email ID" required>
+        <button onclick="sendOtp()">Send OTP</button>
+        
+        <input id="otp" placeholder="Enter OTP" required>
+
         <input id="rpass" placeholder="Password" required>
         <select id="rrole" aria-label="Select role">
             <option value="user">Select Role</option>
@@ -21,7 +26,8 @@
             <option value="artist">Artist</option>
             <!-- <option value="admin">Admin</option> -->
         </select>
-        <button class="r-btn" id="register-account">Register</button>
+        <button onclick="verifyOtp()">Verify & Register</button>
+        <!-- <button class="r-btn" id="register-account">Register</button> -->
         <a href="index.html"><button class="r-btn">Home Page</button></a>
     </div>
 
@@ -29,4 +35,5 @@
     <p id="user-count">Total users: loading...</p>
 
 </body>
+
 </html>
