@@ -7,32 +7,32 @@ const bcrypt = require('bcryptjs');
 // Send OTP for registration (does NOT create user yet)
 async function sendOtpRegister(req, res) {
   try {
-    const { email, username } = req.body; // Get username early!
+    const { email } = req.body;
 
-    if (!username) {
-      return res.status(400).json({ message: "Please enter a username before requesting OTP." });
+    // Check if a fully registered user already exists
+    const existingUser = await userModel.findOne({ email, isVerified: true });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already verified. Please login." });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    // This still creates a record, but now it includes the username 
-    // so your DB isn't filled with anonymous entries.
+    // FIX: We update/create the OTP record, but we don't need to worry 
+    // about the username yet. We will save everything in the next step.
     await userModel.updateOne(
       { email },
-      {
-        username, // Save username here too!
-        otp,
-        otpExpiry: expiry,
-        isVerified: false
-      },
+      { otp, otpExpiry: expiry, isVerified: false },
       { upsert: true }
     );
 
+    // Try sending mail - if this fails, it goes to catch block
     await sendOTP(email, otp);
+
     res.json({ message: "OTP sent to your email" });
   } catch (err) {
-    res.status(500).json({ message: "OTP failed" });
+    console.error("MAILING ERROR:", err);
+    res.status(500).json({ message: "SMTP Error: Check your EMAIL_PASS/App Password." });
   }
 }
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -47,21 +47,19 @@ async function verifyOtpRegister(req, res) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    // 3. SECURE STEP: Now that OTP is valid, hash the password and save details
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
+    // Now we add the username and password ONLY after OTP is correct
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+
     user.username = username;
-    user.password = hashedPassword;
+    user.password = hash;
     user.role = role || 'user';
     user.isVerified = true;
-    user.otp = null; // Clear OTP after use
+    user.otp = null; // Clear OTP
+    
     await user.save();
 
-    // 4. Generate Login Token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
 
     res.cookie('token', token, {
       httpOnly: true,
@@ -70,15 +68,12 @@ async function verifyOtpRegister(req, res) {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    return res.json({
-      message: "Registration successful!",
-      user: { id: user._id, username, email, role: user.role }
-    });
+    return res.json({ message: "Registration successful", user: { username, email } });
   } catch (err) {
-    res.status(500).json({ message: "Verification failed on server." });
+    console.error("VERIFY ERROR:", err);
+    res.status(500).json({ message: "Server failed to save user details." });
   }
 }
-
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Login user
 async function loginUser(req, res) {
@@ -219,5 +214,6 @@ module.exports = {
     sendOtpForgot,
     resetPassword
 };
+
 
 
