@@ -9,12 +9,18 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendOTP(email, otp){
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Your OTP is ${otp}. Valid for 10 minutes.`
-  });
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP Code",
+      text: `Your OTP is ${otp}. Valid for 10 minutes.`
+    });
+    console.log("OTP sent to:", email); // for debugging
+  } catch(err){
+    console.error("Error sending OTP:", err); // logs SMTP issues
+  }
 }
+
 
 module.exports = sendOTP;
