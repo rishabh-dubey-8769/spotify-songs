@@ -35,16 +35,11 @@ async function sendOtp() {
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function verifyOtp() {
-  const emailVal = document.getElementById("email").value;
-  const otpVal = document.getElementById("otp").value;
-  const userVal = document.getElementById("ruser").value;
-  const passVal = document.getElementById("rpass").value;
-  const roleVal = document.getElementById("rrole").value;
-
-  if(!userVal || !passVal || !otpVal) {
-      alert("Please fill all fields before verifying!");
-      return;
-  }
+  const email = document.getElementById("email").value;
+  const otp = document.getElementById("otp").value;
+  const username = document.getElementById("ruser").value;
+  const password = document.getElementById("rpass").value;
+  const role = document.getElementById("rrole").value;
 
   showLoader();
   try {
@@ -52,24 +47,18 @@ async function verifyOtp() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({
-        username: userVal,
-        email: emailVal,
-        password: passVal,
-        role: roleVal,
-        otp: otpVal
-      })
+      body: JSON.stringify({ email, otp, username, password, role })
     });
 
-    const data = await res.json();
+    const data = await res.json(); // Call this ONLY ONCE
     alert(data.message);
 
     if (res.ok) {
       window.location.href = "login.html";
     }
-  } catch (error) {
-    console.error("Verification Error:", error);
-    alert("Something went wrong. Check the console.");
+  } catch (err) {
+    console.error("Fetch error:", err);
+    alert("Check console for errors");
   } finally {
     hideLoader();
   }
@@ -293,6 +282,7 @@ async function checkLogin(){
 
 checkLogin();
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
