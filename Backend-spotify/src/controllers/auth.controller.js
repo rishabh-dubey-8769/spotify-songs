@@ -3,42 +3,43 @@ const userModel=require('../models/user.model')
 const jwt=require('jsonwebtoken')
 const bcrypt=require('bcryptjs')
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+const OtpTemp = require("../models/otp.model");
+
 async function sendOtpRegister(req,res){
   try{
     const {email} = req.body;
 
-    const user = await userModel.findOne({email});
+    let otpEntry = await OtpTemp.findOne({email});
+    const diff = otpEntry ? Date.now() - otpEntry.otpLastAttempt : 0;
 
-    if(user && user.otpLastAttempt){
-      const diff = Date.now() - user.otpLastAttempt.getTime();
-
-      if(diff < 60*60*1000 && user.otpAttempts >= 3){
-        return res.status(429).json({
-          message:"Max OTP attempts reached. Try after 1 hour."
-        });
-      }
+    if(otpEntry && otpEntry.otpAttempts >= 3 && diff < 60*60*1000){
+        return res.status(429).json({message:"Max OTP attempts reached. Try after 1 hour."});
     }
 
     const otp = Math.floor(100000 + Math.random()*900000).toString();
     const expiry = new Date(Date.now()+10*60*1000);
 
-    // ✅ Save first
-    await userModel.updateOne(
-      {email},
-      {
-        $setOnInsert: {otp, otpExpiry: expiry, otpAttempts: 1, otpLastAttempt: new Date()}
-      },
-      {upsert: true} // This will only create document if email doesn't exist
-    );
+    if(otpEntry){
+        otpEntry.otp = otp;
+        otpEntry.otpExpiry = expiry;
+        otpEntry.otpAttempts = otpEntry.otpAttempts + 1;
+        otpEntry.otpLastAttempt = new Date();
+        await otpEntry.save();
+    } else {
+        await OtpTemp.create({
+            email,
+            otp,
+            otpExpiry: expiry,
+            otpAttempts: 1,
+            otpLastAttempt: new Date()
+        });
+    }
 
-
-    // ✅ Send after saving
     await sendOTP(email, otp);
 
     res.json({message:"OTP sent to email"});
-  }
-  catch(err){
-    console.log("OTP ERROR FULL:", err); // VERY IMPORTANT
+  } catch(err){
+    console.error("OTP ERROR FULL:", err);
     res.status(500).json({message:"OTP failed"});
   }
 }
@@ -90,24 +91,37 @@ async function registerUser(req,res){
     });
 }
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+const OtpTemp = require("../models/otp.model");
+const userModel = require("../models/user.model");
+
 async function verifyOtpRegister(req,res){
-    const {email,otp}=req.body;
+    const {email, otp, username, password, role='user'} = req.body;
 
-    const user=await userModel.findOne({email});
+    const otpEntry = await OtpTemp.findOne({email});
 
-    if(!user || user.otp!==otp || user.otpExpiry<new Date()){
+    if(!otpEntry || otpEntry.otp !== otp || otpEntry.otpExpiry < new Date()){
         return res.status(400).json({message:"Invalid or expired OTP"});
     }
 
-    user.isVerified=true;
-    user.otp=null;
-    await user.save();
+    // OTP valid → create or update user
+    const hash = await bcrypt.hash(password, 10);
 
-    // 🔥 NOW LOGIN COOKIE
-    const token=jwt.sign(
-        {id:user._id,role:user.role},
-        process.env.JWT_SECRET
+    let user = await userModel.findOneAndUpdate(
+        {email},
+        {
+            username,
+            password: hash,
+            role,
+            isVerified: true
+        },
+        {upsert:true, new:true}
     );
+
+    // delete temp OTP
+    await otpEntry.deleteOne();
+
+    // generate JWT
+    const token = jwt.sign({id: user._id, role: user.role}, process.env.JWT_SECRET);
 
     res.cookie('token', token, {
         httpOnly:true,
@@ -126,6 +140,7 @@ async function verifyOtpRegister(req,res){
         }
     });
 }
+
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function loginUser(req,res){
@@ -271,6 +286,7 @@ async function getMe(req,res){
 
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe,sendOtpRegister,verifyOtpRegister,sendOtpForgot,resetPassword}
+
 
 
 
