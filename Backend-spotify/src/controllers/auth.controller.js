@@ -6,100 +6,80 @@ const bcrypt = require('bcryptjs');
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Send OTP for registration (does NOT create user yet)
 async function sendOtpRegister(req, res) {
-    try {
-        const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-        const user = await userModel.findOne({ email });
-
-        // Limit OTP attempts to 3 per hour
-        if (user && user.otpLastAttempt) {
-            const diff = Date.now() - user.otpLastAttempt.getTime();
-            if (diff < 60 * 60 * 1000 && user.otpAttempts >= 3) {
-                return res.status(429).json({ message: "Max OTP attempts reached. Try after 1 hour." });
-            }
-        }
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiry = new Date(Date.now() + 10 * 60 * 1000);
-
-        if (user) {
-            // update existing user's OTP info
-            user.otp = otp;
-            user.otpExpiry = expiry;
-            user.otpAttempts = (user.otpAttempts || 0) + 1;
-            user.otpLastAttempt = new Date();
-            await user.save();
-        } else {
-            // Only temp OTP info, do NOT create user yet
-            await userModel.updateOne(
-                { email },
-                { otp, otpExpiry: expiry, otpAttempts: 1, otpLastAttempt: new Date() },
-                { upsert: false }
-            );
-        }
-
-        await sendOTP(email, otp);
-        return res.json({ message: "OTP sent to email (check spam too!)" });
-
-    } catch (err) {
-        console.error("OTP ERROR:", err);
-        return res.status(500).json({ message: "Failed to send OTP" });
+    // 1. Check if user is already verified
+    const existingUser = await userModel.findOne({ email });
+    if (existingUser && existingUser.isVerified) {
+      return res.status(400).json({ message: "User already exists and is verified. Please login." });
     }
-}
 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    // 2. We still use upsert, but we ONLY save email and OTP. 
+    // We don't save username/password yet to avoid "ghost users".
+    await userModel.updateOne(
+      { email },
+      {
+        otp,
+        otpExpiry: expiry,
+        isVerified: false,
+        $setOnInsert: { role: 'user' } // Only sets role if creating new doc
+      },
+      { upsert: true }
+    );
+
+    await sendOTP(email, otp);
+    res.json({ message: "OTP sent to your NITP email" });
+  } catch (err) {
+    console.error("OTP Error:", err);
+    res.status(500).json({ message: "Failed to send OTP. Check server logs." });
+  }
+}
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Verify OTP and create or update user
 async function verifyOtpRegister(req, res) {
-    try {
-        const { email, otp, username, password, role = 'user' } = req.body;
+  try {
+    const { email, otp, username, password, role } = req.body;
 
-        if (!email || !otp || !username || !password) {
-            return res.status(400).json({ message: "Email, OTP, username and password are required" });
-        }
+    const user = await userModel.findOne({ email });
 
-        const user = await userModel.findOne({ email });
-
-        if (!user || user.otp !== otp || user.otpExpiry < new Date()) {
-            return res.status(400).json({ message: "Invalid or expired OTP" });
-        }
-
-        const hash = await bcrypt.hash(password, 10);
-
-        // Create or update user
-        user.username = username;
-        user.password = hash;
-        user.role = role;
-        user.isVerified = true;
-        user.otp = null;
-        user.otpExpiry = null;
-        user.otpAttempts = 0;
-        user.otpLastAttempt = null;
-
-        await user.save();
-
-        // Generate JWT cookie
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "none",
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
-
-        return res.json({
-            message: "Registration successful",
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                role: user.role
-            }
-        });
-
-    } catch (err) {
-        console.error("Verify OTP ERROR:", err);
-        return res.status(500).json({ message: "Server error during OTP verification" });
+    if (!user || user.otp !== otp || user.otpExpiry < new Date()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
+
+    // 3. SECURE STEP: Now that OTP is valid, hash the password and save details
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    user.username = username;
+    user.password = hashedPassword;
+    user.role = role || 'user';
+    user.isVerified = true;
+    user.otp = null; // Clear OTP after use
+    await user.save();
+
+    // 4. Generate Login Token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET
+    );
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    return res.json({
+      message: "Registration successful!",
+      user: { id: user._id, username, email, role: user.role }
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Verification failed on server." });
+  }
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -242,3 +222,4 @@ module.exports = {
     sendOtpForgot,
     resetPassword
 };
+
