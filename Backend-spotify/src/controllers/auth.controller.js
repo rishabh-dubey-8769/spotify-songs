@@ -2,22 +2,34 @@ const sendOTP = require("../services/mail.service");
 const userModel=require('../models/user.model')
 const jwt=require('jsonwebtoken')
 const bcrypt=require('bcryptjs')
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function sendOtpRegister(req,res){
   const {email} = req.body;
 
-  const otp = Math.floor(100000 + Math.random()*900000).toString();
+  const user = await userModel.findOne({email});
 
+  // ✅ limit 3 per hour
+  if(user && user.otpLastAttempt){
+    const diff = Date.now() - user.otpLastAttempt.getTime();
+
+    if(diff < 60*60*1000 && user.otpAttempts >= 3){
+      return res.status(429).json({
+        message:"Max OTP attempts reached. Try after 1 hour."
+      });
+    }
+  }
+
+  const otp = Math.floor(100000 + Math.random()*900000).toString();
   const expiry = new Date(Date.now()+10*60*1000);
 
   await sendOTP(email, otp);
 
   await userModel.updateOne(
-    {email},
+    {email, isVerified:false},
     {
       otp,
       otpExpiry: expiry,
-      otpAttempts:0,
+      otpAttempts: user ? (user.otpAttempts||0)+1 : 1,
       otpLastAttempt:new Date()
     },
     {upsert:true}
@@ -27,6 +39,7 @@ async function sendOtpRegister(req,res){
 }
 
 
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function registerUser(req,res){
     const {username,email,password,role='user'}=req.body;
 
@@ -69,7 +82,7 @@ async function registerUser(req,res){
         message:"OTP sent to email. Verify to complete registration."
     });
 }
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function verifyOtpRegister(req,res){
     const {email,otp}=req.body;
 
@@ -107,7 +120,7 @@ async function verifyOtpRegister(req,res){
     });
 }
 
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function loginUser(req,res){
     const {username,email,password}=req.body
     // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ STRICT NITP EMAIL CHECK
@@ -131,6 +144,12 @@ async function loginUser(req,res){
         })
     }
 
+    if(!user.isVerified){
+        return res.status(403).json({
+            message:"Please verify OTP before login"
+        });
+    }
+  
     const isPasswordValid=await bcrypt.compare(password,user.password)
     if(!isPasswordValid){
         return res.status(401).json({
@@ -160,7 +179,7 @@ async function loginUser(req,res){
         }
     })
 }
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function sendOtpForgot(req,res){
   const {email} = req.body;
 
@@ -178,7 +197,7 @@ async function sendOtpForgot(req,res){
 
   res.json({message:"OTP sent"});
 }
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function resetPassword(req,res){
   const {email,otp,newPassword} = req.body;
 
@@ -196,7 +215,7 @@ async function resetPassword(req,res){
   res.json({message:"Password updated"});
 }
 
-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function logoutUser(req,res){
     res.clearCookie('token', {
         httpOnly: true,
@@ -208,7 +227,7 @@ async function logoutUser(req,res){
         message:'User logged out successfully'
     })
 }
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function getUserCount(req,res){
   try{
     const count = await userModel.countDocuments();
@@ -217,7 +236,7 @@ async function getUserCount(req,res){
     res.status(500).json({message:"Server error"});
   }
 }
-
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 async function getMe(req,res){
   try{
     const token = req.cookies.token;
@@ -245,6 +264,7 @@ async function getMe(req,res){
 
 
 module.exports={registerUser,loginUser,logoutUser,getUserCount,getMe,sendOtpRegister,verifyOtpRegister,sendOtpForgot,resetPassword}
+
 
 
 
