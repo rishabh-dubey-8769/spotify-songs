@@ -7,35 +7,32 @@ const bcrypt = require('bcryptjs');
 // Send OTP for registration (does NOT create user yet)
 async function sendOtpRegister(req, res) {
   try {
-    const { email } = req.body;
+    const { email, username } = req.body; // Get username early!
 
-    // 1. Check if user is already verified
-    const existingUser = await userModel.findOne({ email });
-    if (existingUser && existingUser.isVerified) {
-      return res.status(400).json({ message: "User already exists and is verified. Please login." });
+    if (!username) {
+      return res.status(400).json({ message: "Please enter a username before requesting OTP." });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    // 2. We still use upsert, but we ONLY save email and OTP. 
-    // We don't save username/password yet to avoid "ghost users".
+    // This still creates a record, but now it includes the username 
+    // so your DB isn't filled with anonymous entries.
     await userModel.updateOne(
       { email },
       {
+        username, // Save username here too!
         otp,
         otpExpiry: expiry,
-        isVerified: false,
-        $setOnInsert: { role: 'user' } // Only sets role if creating new doc
+        isVerified: false
       },
       { upsert: true }
     );
 
     await sendOTP(email, otp);
-    res.json({ message: "OTP sent to your NITP email" });
+    res.json({ message: "OTP sent to your email" });
   } catch (err) {
-    console.error("OTP Error:", err);
-    res.status(500).json({ message: "Failed to send OTP. Check server logs." });
+    res.status(500).json({ message: "OTP failed" });
   }
 }
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -222,4 +219,5 @@ module.exports = {
     sendOtpForgot,
     resetPassword
 };
+
 
